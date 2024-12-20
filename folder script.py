@@ -20,9 +20,9 @@ noext = ['']
 folder_path ={}
 
 for folder in folders:
-    folder_path[folder] = f'C:\\{usr}\\Downloads\\{folder}' 
-    
+    folder_path[folder] = downloads_path / folder       
 
+    
 
 count = 0 # 0 is base case (nothing moved) | 1 indicates that last moved files are in their respective folders | 2 indicates that last moved files are in downloads folder
 
@@ -39,7 +39,7 @@ def func():
 
 
     if moved:   
-        for entry in Path().iterdir():
+        for entry in Path(downloads_path).iterdir():
             if entry.is_file(): #and entry.suffix != '':
                 moved.clear()
                 func()
@@ -50,29 +50,30 @@ def func():
         for entry in Path(downloads_path).iterdir():
             if entry.is_file() or entry.is_symlink():
                 nm += 1
-                filepath = downloads_path / entry
                 ext = entry.suffix
                 if ext in programext: #this is the way for now as bidict doesn't support lists as the values
-                    shutil.move(filepath, folder_path['Programs'])
-                    moved.append(downloads_path / folder_path['Programs'] / entry)
+                    shutil.move(entry, folder_path['Programs'])
+                    moved.append(folder_path['Programs'] /entry.name) 
                 elif ext in mediaext:
-                    shutil.move(filepath, folder_path['Media'])
-                    moved.append(downloads_path / folder_path['Media'] / entry)
+                    shutil.move(entry, folder_path['Media'])
+                    moved.append(folder_path['Media'] / entry.name)
                 elif ext in docext:
-                    shutil.move(filepath, folder_path['Documents'])
-                    moved.append(downloads_path / folder_path['Documents'] / entry)
+                    shutil.move(entry, folder_path['Documents'])
+                    moved.append(folder_path['Documents'] / entry.name)
                 elif ext in zipext:
-                    shutil.move(filepath, folder_path['Zips_archived'])
-                    moved.append(downloads_path / folder_path['Zips_archived'] / entry)
+                    shutil.move(entry, folder_path['Zips_archived'])
+                    moved.append(folder_path['Zips_archived'] / entry.name)
                 elif ext == '': 
-                    shutil.move(filepath, folder_path['no_extension'])
-                    moved.append(downloads_path / folder_path['no_extension'] / entry)
+                    shutil.move(entry, folder_path['no_extension'])
+                    moved.append(folder_path['no_extension'] / entry.name)
                 else:
-                    shutil.move(filepath, folder_path['Misc'])
-                    moved.append(downloads_path / folder_path['Misc'] / entry)
-            elif entry.is_dir():    # need to add capability to move dirs, wihtout interfering with the target dirs
-                pass
-            count = 1 # This indicates that the files have been moved to their relevant folders 
+                    shutil.move(entry, folder_path['Misc'])
+                    moved.append(folder_path['Misc'] / entry.name)
+            #elif entry.is_dir():    # need to add capability to move dirs, wihtout interfering with the target dirs
+                #pass
+        count = 1 # This indicates that the files have been moved to their relevant folders 
+            
+            
 
         print(f'Successfully moved {nm} files')
         ans = input = ('Press Enter to continue...')
@@ -86,16 +87,16 @@ def func():
             #start()
 
 def reset_all():
-    global folders, moved, count
+    global folder_path, folders, moved, count
 
     moved.clear()
 
     for folder in folders:
-        if os.path.isdir(folder):
-            for file in os.scandir(f'C:\\Users\\{usr}\\Downloads\\{folder}'):
-                if file.is_file() and os.path.splitext(file.name)[1]:
-                    shutil.move(f'C:\\Users\\{usr}\\Downloads\\{folder}\\{file.name}', f'C:\\Users\\{usr}\\Downloads')
-            os.rmdir(f'C:\\Users\\{usr}\\Downloads\\{folder}')
+        if Path(folder_path[folder]).exists():
+            for file in Path(downloads_path / folder).iterdir(): 
+                if file.is_file() or file.is_symlink():
+                    shutil.move(downloads_path / file, downloads_path)
+            Path.rmdir(downloads_path / folder)
         
     
     count = 0
@@ -107,42 +108,66 @@ def reset_all():
 
 
 def undo():
-    global moved, count, programs, media, docs, zips, misc, noext, programext, mediaext, docext, zipext
+    global moved, count, programs, media, docs, zips, Misc, noext, programext, mediaext, docext, zipext, downloads_path
+
+    # Regarding count:
+    # 0 is base case (nothing moved) 
+    # 1 indicates that last moved files are in their respective folders 
+    # 2 indicates that last moved files are in downloads folder
 
     if count == 1:
+        nm = 0 # number of files moved
         for filepath in moved:
-            shutil.move(filepath, f'C:\\Users\\{usr}\\Downloads')
+            shutil.move(filepath, downloads_path)
+            nm += 1
         for i in range(len(moved)):
             for folder in folders:
-                moved[i] = moved[i].replace(f'\\{folder}', '')
+                moved[i] = Path(str(moved[i]).replace(f'\\{folder}', ''))
         for folder in folders:
-            if not os.scandir(folder):
-                os.rmdir(folder)
+            if Path(folder_path[folder]).exists(): # should check if theres any files (added by user) in there and add msg that 
+                # 'x folder wasn't deleted as there were extra files added blah blah'
+                Path.rmdir(folder_path[folder])
             
         count += 1
+        print(f"Successfully moved {nm} files back to the downloads directory")
+        ans = input = ('Press Enter to continue...')
+        print (ans)
+        keyboard.wait('enter')
         start()
 
-    elif count == 2:
+    elif count == 2: 
+        nm = 0 # number of files moved
         if moved:
+            for folder in folders:
+                if not Path(folder_path[folder]).exists():
+                    Path(folder_path[folder]).mkdir()
             for entry in moved:
-                name = entry.rsplit('\\', 1)[1]
-                ext = '.' + name.rsplit(".")[1]
+                nm += 1
+                name = entry.name
+                ext = entry.suffix
                 if ext in programext:
-                    shutil.move(entry, programs)
-                    moved[moved.index(entry)] = (f'{programs}\\{name}')
+                    shutil.move(entry, folder_path['Programs'])
+                    moved[moved.index(entry)] = folder_path['Programs'] / name
                 elif ext in mediaext:
-                    shutil.move(entry, media)
-                    moved[moved.index(entry)] = (f'{media}\\{name}')
+                    shutil.move(entry, folder_path['Media'])
+                    moved[moved.index(entry)] = folder_path['Media'] / name
                 elif ext in docext:
-                    shutil.move(entry, docs)
-                    moved[moved.index(entry)] = (f'{docs}\\{name}')
+                    shutil.move(entry, folder_path['Documents'])
+                    moved[moved.index(entry)] = folder_path['Documents'] / name 
                 elif ext in zipext:
-                    shutil.move(entry, zips)
-                    moved[moved.index(entry)] = (f'{zips}\\{name}')
+                    shutil.move(entry, folder_path['Zips_archived'])
+                    moved[moved.index(entry)] = folder_path['Zips_archived'] / name 
+                elif ext == '': 
+                    shutil.move(entry, folder_path['no_extension'])
+                    moved[moved.index(entry)] = folder_path['no_extension'] / name
                 else:
-                    shutil.move(entry, misc)
-                    moved[moved.index(entry)] = (f'{misc}\\{name}')
+                    shutil.move(entry, folder_path['Misc'])
+                    moved[moved.index(entry)] = folder_path['Misc'] / name
             count = 1
+            print(f"Successfully moved {nm} files back to their folders'")
+            ans = input = ('Press Enter to continue...')
+            print (ans)
+            keyboard.wait('enter')
             start()
     elif count == 0:
         print('Nothing to undo')
